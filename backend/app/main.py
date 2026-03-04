@@ -6,8 +6,10 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import Settings, get_settings
 from app.db import init_db, make_engine
-from app.routers import documents, health
+from app.routers import chat, documents, health
 from app.services.embeddings import get_embeddings
+from app.services.llm import get_chat_model
+from app.services.rag import RagService
 from app.services.vectorstore import VectorStore
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
@@ -25,6 +27,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         app.state.settings = settings
         app.state.engine = engine
         app.state.store = store
+        app.state.rag = RagService(store, get_chat_model(settings), settings)
         yield
         engine.dispose()
 
@@ -37,6 +40,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     )
     app.include_router(health.router)
     app.include_router(documents.router)
+    app.include_router(chat.router)
     return app
 
 
