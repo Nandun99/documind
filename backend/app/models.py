@@ -24,3 +24,22 @@ class Document(SQLModel, table=True):
     chunk_count: int = 0
     created_at: datetime = Field(default_factory=utcnow)
 
+
+class Conversation(SQLModel, table=True):
+    id: str = Field(default_factory=new_id, primary_key=True)
+    title: str
+    created_at: datetime = Field(default_factory=utcnow)
+    updated_at: datetime = Field(default_factory=utcnow)
+
+
+class Message(SQLModel, table=True):
+    id: int | None = Field(default=None, primary_key=True)
+    conversation_id: str = Field(foreign_key="conversation.id", index=True)
+    role: str  # user | assistant
+    content: str
+    sources: str | None = None  # JSON encoded list of sources
+    input_tokens: int = 0
+    output_tokens: int = 0
+    cost_usd: float = 0.0
+    latency_ms: int = 0
+    created_at: datetime = Field(default_factory=utcnow)
