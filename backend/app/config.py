@@ -10,6 +10,7 @@ class Settings(BaseSettings):
     app_name: str = "DocuMind"
     openai_api_key: str | None = None
 
+    # "openai" uses the OpenAI API, "local" runs fully offline (useful for tests and demos)
     llm_provider: str = "openai"
     embedding_provider: str = "openai"
     chat_model: str = "gpt-4o-mini"
