@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { ArrowUp, FileSearch } from 'lucide-react'
+import { ArrowUp, FileSearch, Square } from 'lucide-react'
 import type { ChatMessage } from '../types'
 import { MessageBubble } from './MessageBubble'
 
@@ -15,9 +15,10 @@ interface Props {
   hasDocuments: boolean
   scopeLabel: string
   onSend: (question: string) => void
+  onStop: () => void
 }
 
-export function ChatWindow({ messages, busy, hasDocuments, scopeLabel, onSend }: Props) {
+export function ChatWindow({ messages, busy, hasDocuments, scopeLabel, onSend, onStop }: Props) {
   const [input, setInput] = useState('')
   const bottomRef = useRef<HTMLDivElement>(null)
 
@@ -87,14 +88,20 @@ export function ChatWindow({ messages, busy, hasDocuments, scopeLabel, onSend }:
               disabled={!hasDocuments}
               className="max-h-40 flex-1 resize-none bg-transparent py-1.5 text-sm outline-none placeholder:text-slate-400"
             />
-            <button
-              onClick={() => submit()}
-              disabled={!input.trim() || !hasDocuments || busy}
-              className="rounded-xl bg-indigo-600 p-2 text-white hover:bg-indigo-500 disabled:bg-slate-300"
-              title="Send"
-            >
-              <ArrowUp className="h-4 w-4" />
-            </button>
+            {busy ? (
+              <button onClick={onStop} className="rounded-xl bg-slate-800 p-2 text-white hover:bg-slate-700" title="Stop">
+                <Square className="h-4 w-4" />
+              </button>
+            ) : (
+              <button
+                onClick={() => submit()}
+                disabled={!input.trim() || !hasDocuments}
+                className="rounded-xl bg-indigo-600 p-2 text-white hover:bg-indigo-500 disabled:bg-slate-300"
+                title="Send"
+              >
+                <ArrowUp className="h-4 w-4" />
+              </button>
+            )}
           </div>
           <p className="mt-2 text-center text-[11px] text-slate-400">{scopeLabel}</p>
         </div>
