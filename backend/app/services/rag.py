@@ -1,10 +1,10 @@
 import re
 import time
-from collections.abc import Sequence
+from collections.abc import AsyncIterator, Sequence
 from dataclasses import asdict, dataclass, field
 
 from langchain_core.language_models import BaseChatModel
-from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage
+from langchain_core.messages import AIMessage, AIMessageChunk, BaseMessage, HumanMessage, SystemMessage
 
 from app.config import Settings
 from app.services.vectorstore import VectorStore
@@ -135,6 +135,37 @@ class RagService:
             usage=self._usage(getattr(response, "usage_metadata", None)),
             timings=Timings(retrieval_ms, _ms(generation_start), _ms(start)),
         )
+
+    async def astream(self, question: str, history: Sequence[tuple[str, str]] = (),
+                      document_ids: list[str] | None = None) -> AsyncIterator[dict]:
+        """Yield events: sources first, then tokens, then a final `done` event with the full answer."""
+        start = time.perf_counter()
+        chunks = self.retrieve(question, document_ids)
+        retrieval_ms = _ms(start)
+        yield {"type": "sources", "sources": [c.to_source() for c in chunks]}
+
+        if not chunks:
+            yield {"type": "token", "content": NO_ANSWER}
+            result = RagAnswer(NO_ANSWER, [], timings=Timings(retrieval_ms, 0, _ms(start)))
+            yield {"type": "done", "result": result}
+            return
+
+        generation_start = time.perf_counter()
+        full: AIMessageChunk | None = None
+        async for part in self.chat_model.astream(self.build_messages(question, chunks, history)):
+            full = part if full is None else full + part
+            if part.content:
+                yield {"type": "token", "content": part.content}
+
+        answer = str(full.content).strip() if full else ""
+        mark_citations(answer, chunks)
+        result = RagAnswer(
+            answer=answer,
+            sources=chunks,
+            usage=self._usage(full.usage_metadata if full else None),
+            timings=Timings(retrieval_ms, _ms(generation_start), _ms(start)),
+        )
+        yield {"type": "done", "result": result}
 
 
 def usage_dict(result: RagAnswer) -> dict:

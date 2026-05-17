@@ -55,6 +55,7 @@ export default function App() {
           hasDocuments={readyDocs.length > 0}
           scopeLabel={scopeLabel}
           onSend={(question) => chat.send(question, activeSelection)}
+          onStop={chat.stop}
         />
       </main>
     </div>

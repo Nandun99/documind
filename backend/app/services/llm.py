@@ -1,10 +1,11 @@
 import re
+from collections.abc import Iterator
 from typing import Any
 
 from langchain_core.callbacks import CallbackManagerForLLMRun
 from langchain_core.language_models import BaseChatModel
-from langchain_core.messages import AIMessage, BaseMessage
-from langchain_core.outputs import ChatGeneration, ChatResult
+from langchain_core.messages import AIMessage, AIMessageChunk, BaseMessage
+from langchain_core.outputs import ChatGeneration, ChatGenerationChunk, ChatResult
 from langchain_openai import ChatOpenAI
 
 from app.config import Settings
@@ -21,7 +22,7 @@ class ExtractiveChatModel(BaseChatModel):
     """Offline stand-in for the OpenAI chat model.
 
     It answers with the first sentences of the top ranked source, so the whole
-    pipeline (retrieval, citations, usage tracking) works without an API key.
+    pipeline (retrieval, citations, streaming, usage tracking) works without an API key.
     """
 
     max_sentences: int = 2
@@ -51,6 +52,18 @@ class ExtractiveChatModel(BaseChatModel):
         message = AIMessage(content=answer, usage_metadata=self._usage(messages, answer))
         return ChatResult(generations=[ChatGeneration(message=message)])
 
+    def _stream(self, messages: list[BaseMessage], stop: list[str] | None = None,
+                run_manager: CallbackManagerForLLMRun | None = None, **kwargs: Any) -> Iterator[ChatGenerationChunk]:
+        answer = self._answer(messages)
+        words = answer.split(" ")
+        for i, word in enumerate(words):
+            token = word if i == 0 else f" {word}"
+            chunk = ChatGenerationChunk(message=AIMessageChunk(content=token))
+            if run_manager:
+                run_manager.on_llm_new_token(token, chunk=chunk)
+            yield chunk
+        yield ChatGenerationChunk(message=AIMessageChunk(content="", usage_metadata=self._usage(messages, answer)))
+
 
 def get_chat_model(settings: Settings) -> BaseChatModel:
     if settings.llm_provider == "local":
@@ -60,4 +73,5 @@ def get_chat_model(settings: Settings) -> BaseChatModel:
         temperature=settings.temperature,
         max_tokens=settings.max_output_tokens,
         api_key=settings.openai_api_key,
+        stream_usage=True,
     )

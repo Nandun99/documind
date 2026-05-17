@@ -1,3 +1,5 @@
+import json
+
 from app.services.rag import NO_ANSWER
 from tests.conftest import RECIPES
 
@@ -59,3 +61,28 @@ def test_conversation_history_is_saved(client, handbook):
 def test_unknown_conversation(client, handbook):
     assert ask(client, "leave days?", conversation_id="missing").status_code == 404
 
+
+def parse_sse(text: str) -> list[tuple[str, dict]]:
+    events = []
+    for block in text.strip().split("\n\n"):
+        lines = dict(line.split(": ", 1) for line in block.splitlines())
+        events.append((lines["event"], json.loads(lines["data"])))
+    return events
+
+
+def test_streaming_chat(client, handbook):
+    with client.stream("POST", "/api/chat/stream", json={"question": "When must expense claims be submitted?"}) as response:
+        assert response.status_code == 200
+        events = parse_sse(response.read().decode())
+
+    names = [name for name, _ in events]
+    assert names[0] == "conversation" and names[1] == "sources" and names[-1] == "done"
+    streamed = "".join(data["content"] for name, data in events if name == "token")
+    done = events[-1][1]
+    assert streamed.strip() == done["answer"]
+    assert "30 days" in done["answer"]
+    assert done["usage"]["output_tokens"] > 0
+
+    conversation_id = events[0][1]["conversation_id"]
+    messages = client.get(f"/api/conversations/{conversation_id}/messages").json()
+    assert messages[-1]["content"] == done["answer"]

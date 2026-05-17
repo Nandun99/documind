@@ -2,6 +2,7 @@ import json
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
+from fastapi.responses import StreamingResponse
 from sqlmodel import Session, func, select
 
 from app.db import get_session
@@ -73,6 +74,39 @@ def chat(body: ChatRequest, request: Request, session: Session = Depends(get_ses
         "usage": usage_dict(result),
         "timings": timings_dict(result),
     }
+
+
+def _sse(event: str, data: dict) -> str:
+    return f"event: {event}\ndata: {json.dumps(data)}\n\n"
+
+
+@router.post("/chat/stream")
+async def chat_stream(body: ChatRequest, request: Request, session: Session = Depends(get_session)) -> StreamingResponse:
+    _check_documents(session, body.document_ids)
+    state = request.app.state
+    conversation = _get_conversation(session, body)
+    history = _history(session, conversation.id, state.settings.max_history_messages)
+    conversation_id = conversation.id
+
+    async def events():
+        yield _sse("conversation", {"conversation_id": conversation_id})
+        try:
+            async for event in state.rag.astream(body.question, history, body.document_ids):
+                if event["type"] == "sources":
+                    yield _sse("sources", {"sources": event["sources"]})
+                elif event["type"] == "token":
+                    yield _sse("token", {"content": event["content"]})
+                else:
+                    result: RagAnswer = event["result"]
+                    with Session(state.engine) as db:
+                        _save_exchange(db, db.get(Conversation, conversation_id), body.question, result)
+                    yield _sse("done", {"answer": result.answer, "sources": result.source_dicts(),
+                                        "usage": usage_dict(result), "timings": timings_dict(result)})
+        except Exception as exc:
+            yield _sse("error", {"detail": str(exc)})
+
+    return StreamingResponse(events(), media_type="text/event-stream",
+                             headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
 
 
 @router.get("/conversations", response_model=list[ConversationOut])
