@@ -1,11 +1,30 @@
 import { useCallback, useRef, useState } from 'react'
-import { streamChat } from '../api/client'
-import type { ChatMessage } from '../types'
+import { api, streamChat } from '../api/client'
+import type { ChatMessage, StoredMessage } from '../types'
 
 let counter = 0
 const nextId = () => `local-${++counter}`
 
-export function useChat() {
+function fromStored(message: StoredMessage): ChatMessage {
+  return {
+    id: String(message.id),
+    role: message.role,
+    content: message.content,
+    sources: message.sources,
+    usage:
+      message.role === 'assistant'
+        ? {
+            input_tokens: message.input_tokens,
+            output_tokens: message.output_tokens,
+            total_tokens: message.input_tokens + message.output_tokens,
+            cost_usd: message.cost_usd,
+          }
+        : undefined,
+    latencyMs: message.role === 'assistant' ? message.latency_ms : undefined,
+  }
+}
+
+export function useChat(onConversationCreated: () => void) {
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [conversationId, setConversationId] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
@@ -25,6 +44,7 @@ export function useChat() {
       setBusy(true)
       const controller = new AbortController()
       abortRef.current = controller
+      const isNew = conversationId === null
 
       try {
         await streamChat(
@@ -49,6 +69,7 @@ export function useChat() {
           },
           controller.signal,
         )
+        if (isNew) onConversationCreated()
       } catch (err) {
         if ((err as Error).name === 'AbortError') {
           updateMessage(assistantId, (m) => ({ ...m, pending: false }))
@@ -65,10 +86,17 @@ export function useChat() {
         abortRef.current = null
       }
     },
-    [conversationId],
+    [conversationId, onConversationCreated],
   )
 
   const stop = useCallback(() => abortRef.current?.abort(), [])
+
+  const open = useCallback(async (id: string) => {
+    abortRef.current?.abort()
+    const stored = await api.getMessages(id)
+    setConversationId(id)
+    setMessages(stored.map(fromStored))
+  }, [])
 
   const reset = useCallback(() => {
     abortRef.current?.abort()
@@ -76,5 +104,5 @@ export function useChat() {
     setMessages([])
   }, [])
 
-  return { messages, conversationId, busy, send, stop, reset }
+  return { messages, conversationId, busy, send, stop, open, reset }
 }
