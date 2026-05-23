@@ -1,14 +1,17 @@
 import { useState } from 'react'
-import { BrainCircuit } from 'lucide-react'
+import { BrainCircuit, Plus } from 'lucide-react'
 import { ChatWindow } from './components/ChatWindow'
+import { ConversationList } from './components/ConversationList'
 import { DocumentList } from './components/DocumentList'
 import { UploadDropzone } from './components/UploadDropzone'
 import { useChat } from './hooks/useChat'
+import { useConversations } from './hooks/useConversations'
 import { useDocuments } from './hooks/useDocuments'
 
 export default function App() {
   const docs = useDocuments()
-  const chat = useChat()
+  const conversations = useConversations()
+  const chat = useChat(conversations.refresh)
   const [selected, setSelected] = useState<string[]>([])
 
   const readyDocs = docs.documents.filter((d) => d.status === 'ready')
@@ -21,6 +24,11 @@ export default function App() {
   const scopeLabel = activeSelection.length
     ? `Searching ${activeSelection.length} selected ${activeSelection.length === 1 ? 'document' : 'documents'}`
     : `Searching all ${readyDocs.length} ${readyDocs.length === 1 ? 'document' : 'documents'}`
+
+  const deleteConversation = async (id: string) => {
+    await conversations.remove(id)
+    if (chat.conversationId === id) chat.reset()
+  }
 
   return (
     <div className="flex h-full bg-slate-50 font-sans text-slate-900">
@@ -45,6 +53,23 @@ export default function App() {
             </div>
           </section>
 
+          <section>
+            <div className="mb-2 flex items-center justify-between px-1">
+              <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-500">Conversations</h2>
+              <button
+                onClick={chat.reset}
+                className="flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-indigo-600 hover:bg-indigo-50"
+              >
+                <Plus className="h-3.5 w-3.5" /> New chat
+              </button>
+            </div>
+            <ConversationList
+              conversations={conversations.conversations}
+              activeId={chat.conversationId}
+              onOpen={chat.open}
+              onDelete={deleteConversation}
+            />
+          </section>
         </div>
       </aside>
 

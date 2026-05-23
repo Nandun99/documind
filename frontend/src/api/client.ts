@@ -1,4 +1,4 @@
-import type { DocumentInfo, Source, Timings, Usage } from '../types'
+import type { Conversation, DocumentInfo, Source, StoredMessage, Timings, Usage } from '../types'
 
 const BASE = import.meta.env.VITE_API_URL ?? ''
 
@@ -37,6 +37,12 @@ export const api = {
   },
 
   deleteDocument: (id: string) => request<void>(`/api/documents/${id}`, { method: 'DELETE' }),
+
+  listConversations: () => request<Conversation[]>('/api/conversations'),
+
+  getMessages: (id: string) => request<StoredMessage[]>(`/api/conversations/${id}/messages`),
+
+  deleteConversation: (id: string) => request<void>(`/api/conversations/${id}`, { method: 'DELETE' }),
 }
 
 export interface StreamHandlers {

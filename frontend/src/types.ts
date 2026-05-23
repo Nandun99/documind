@@ -35,6 +35,13 @@ export interface Timings {
   total_ms: number
 }
 
+export interface Conversation {
+  id: string
+  title: string
+  created_at: string
+  updated_at: string
+}
+
 export interface ChatMessage {
   id: string
   role: 'user' | 'assistant'
@@ -44,4 +51,16 @@ export interface ChatMessage {
   latencyMs?: number
   pending?: boolean
   error?: boolean
+}
+
+export interface StoredMessage {
+  id: number
+  role: 'user' | 'assistant'
+  content: string
+  sources: Source[]
+  input_tokens: number
+  output_tokens: number
+  cost_usd: number
+  latency_ms: number
+  created_at: string
 }
