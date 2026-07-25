@@ -17,6 +17,7 @@ def ingest_document(state, document_id: str, path: Path) -> None:
         document = session.get(Document, document_id)
         if document is None:
             return
+        chunks = []
         try:
             pages = load_file(path, document.filename)
             chunks = split_documents(pages, settings.chunk_size, settings.chunk_overlap)
@@ -26,6 +27,7 @@ def ingest_document(state, document_id: str, path: Path) -> None:
             logger.info("Ingested %s: %d pages, %d chunks", document.filename, document.pages, document.chunk_count)
         except Exception as exc:  # keep the error on the document so the UI can show it
             logger.exception("Failed to ingest %s", document.filename)
+            state.store.delete_document(document.id, len(chunks))  # remove any batches that were already added
             document.status = "failed"
             document.error = str(exc)
         session.add(document)
