@@ -24,7 +24,8 @@ class Settings(BaseSettings):
     chunk_size: int = 1000
     chunk_overlap: int = 150
     top_k: int = 4
-    min_relevance: float = 0.2
+    # chunks below this relevance score are ignored (default depends on the embedding provider)
+    min_relevance: float | None = None
     max_history_messages: int = 6
     max_upload_mb: int = 20
 
@@ -33,6 +34,13 @@ class Settings(BaseSettings):
     output_cost_per_1m: float = 0.60
 
     cors_origins: list[str] = ["http://localhost:5173", "http://localhost:3000"]
+
+    @property
+    def relevance_threshold(self) -> float:
+        if self.min_relevance is not None:
+            return self.min_relevance
+        # the offline hashing embeddings give much lower scores than OpenAI embeddings
+        return 0.05 if self.embedding_provider == "local" else 0.2
 
     @property
     def upload_dir(self) -> Path:

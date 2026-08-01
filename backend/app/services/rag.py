@@ -85,7 +85,7 @@ class RagService:
         results = self.store.search(question, k=self.settings.top_k, document_ids=document_ids)
         chunks = []
         for doc, score in results:
-            if score < self.settings.min_relevance:
+            if score < self.settings.relevance_threshold:
                 continue
             chunks.append(RetrievedChunk(
                 index=len(chunks) + 1,
