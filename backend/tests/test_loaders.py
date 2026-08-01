@@ -1,4 +1,5 @@
 import pytest
+from docx import Document as DocxDocument
 
 from app.services.chunking import split_documents
 from app.services.loaders import EmptyDocumentError, UnsupportedFileType, load_file
@@ -20,6 +21,17 @@ def test_load_pdf_keeps_page_numbers(tmp_path):
     assert [d.metadata["page"] for d in docs] == [1, 2]
     assert "costs" in docs[1].page_content
 
+
+def test_load_docx_includes_tables(tmp_path):
+    doc = DocxDocument()
+    doc.add_paragraph("Quarterly summary")
+    table = doc.add_table(rows=1, cols=2)
+    table.rows[0].cells[0].text = "Region"
+    table.rows[0].cells[1].text = "Asia"
+    path = tmp_path / "summary.docx"
+    doc.save(path)
+    text = load_file(path, "summary.docx")[0].page_content
+    assert "Quarterly summary" in text and "Region | Asia" in text
 
 
 def test_unsupported_and_empty_files(tmp_path):

@@ -23,6 +23,9 @@ def _read_pdf(path: Path) -> list[tuple[int, str]]:
 def _read_docx(path: Path) -> list[tuple[int, str]]:
     doc = DocxDocument(str(path))
     parts = [p.text for p in doc.paragraphs]
+    for table in doc.tables:
+        for row in table.rows:
+            parts.append(" | ".join(cell.text.strip() for cell in row.cells))
     return [(1, "\n".join(parts))]
 
 
