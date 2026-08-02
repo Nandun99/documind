@@ -20,6 +20,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
+        uses_openai = "openai" in (settings.llm_provider, settings.embedding_provider)
+        if uses_openai and not settings.openai_api_key:
+            raise RuntimeError("OPENAI_API_KEY is not set. Add it to backend/.env or run with LLM_PROVIDER=local and EMBEDDING_PROVIDER=local")
         settings.data_dir.mkdir(parents=True, exist_ok=True)
         engine = make_engine(settings.database_url)
         init_db(engine)
